@@ -1,5 +1,9 @@
 // Libraries give us ready-made tools.
+#include <WiFi.h>               // Connect the ESP32 to Wi-Fi
+#include <WebServer.h>          // Run a website on the ESP32
+#include <Wire.h>               // Communicate using I2C
 #include <Adafruit_MPU6050.h>   // Read the MPU6050 sensor
+#include "firebase_upload.h" // Sign in and upload sensor readings
 #include <Adafruit_Sensor.h>    // Define the sensor reading format
 
 // Define which ESP32 pins we are using.
@@ -417,6 +421,9 @@ void setup() {
   server.begin();
 
   Serial.println("Web server started!");
+
+  // Prepare time synchronization and ask for the device password.
+  firebaseBegin();
 }
 
 
@@ -429,6 +436,10 @@ void loop() {
 
   // Handle requests from the website.
   server.handleClient();
+
+  // Send the latest values to Firebase (approximately every 5 seconds).
+  firebaseUpload(lightPercent, lightRaw, accelX, accelY, accelZ,
+                 gyroX, gyroY, gyroZ);
 
   // Pause briefly so the program does not run a busy loop.
   delay(2);
