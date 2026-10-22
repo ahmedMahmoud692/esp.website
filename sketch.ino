@@ -1,7 +1,4 @@
 // Libraries give us ready-made tools.
-#include <WiFi.h>               // Connect the ESP32 to Wi-Fi
-#include <WebServer.h>          // Run a website on the ESP32
-#include <Wire.h>               // Communicate using I2C
 #include <Adafruit_MPU6050.h>   // Read the MPU6050 sensor
 #include <Adafruit_Sensor.h>    // Define the sensor reading format
 
