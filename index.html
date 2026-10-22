@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ESP32 Sensor Readings</title>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f2f4f7;
+      color: #222;
+      max-width: 650px;
+      margin: 30px auto;
+      padding: 15px;
+    }
+
+    section {
+      background: white;
+      padding: 20px;
+      margin-bottom: 20px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+    }
+
+    h1 {
+      font-size: 26px;
+    }
+
+    h2 {
+      font-size: 20px;
+      margin-top: 0;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: center;
+    }
+
+    th, td {
+      border-bottom: 1px solid #ddd;
+      padding: 12px 5px;
+    }
+
+    .value {
+      font-size: 32px;
+      font-weight: bold;
+    }
+
+    .note, #status {
+      font-size: 14px;
+      color: #555;
+    }
+  </style>
+</head>
+
+<body>
+  <h1>ESP32 Sensor Readings</h1>
+
+  <section>
+    <h2>Light Level</h2>
+    <p class="value" id="light">--</p>
+    <p>ADC reading: <span id="raw">--</span></p>
+    <p class="note">Relative brightness estimate, not lux.</p>
+  </section>
+
+  <section>
+    <h2>Acceleration</h2>
+
+    <table>
+      <tr>
+        <th scope="col">X</th>
+        <th scope="col">Y</th>
+        <th scope="col">Z</th>
+      </tr>
+      <tr>
+        <td id="ax">--</td>
+        <td id="ay">--</td>
+        <td id="az">--</td>
+      </tr>
+    </table>
+
+    <p class="note">Unit: m/s². Includes gravity.</p>
+  </section>
+
+  <section>
+    <h2>Angular Velocity</h2>
+
+    <table>
+      <tr>
+        <th scope="col">X</th>
+        <th scope="col">Y</th>
+        <th scope="col">Z</th>
+      </tr>
+      <tr>
+        <td id="gx">--</td>
+        <td id="gy">--</td>
+        <td id="gz">--</td>
+      </tr>
+    </table>
+
+    <p class="note">Unit: degrees per second.</p>
+  </section>
+
+  <p id="status" role="status">Waiting for readings...</p>
+
+  <script>
+    // Read the sensor values uploaded by the ESP32 to Firebase.
+    const databaseURL =
+      'https://esp32-sensor-monitor-4973b-default-rtdb.firebaseio.com/devices/esp32-01/latest.json';
+
+    async function updateDashboard() {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 10000);
+
+      try {
+        const response = await fetch(databaseURL, {
+          cache: 'no-store',
+          signal: controller.signal
+        });
+
+        if (!response.ok) {
+          throw new Error('Could not read Firebase data');
+        }
+
+        const data = await response.json();
+
+        if (data === null) {
+          document.getElementById('status').textContent =
+            'No readings yet. Start your Wokwi simulation.';
+          return;
+        }
+
+        // Check the readings before displaying them.
+        const fields = [
+          'light', 'raw', 'ax', 'ay', 'az', 'gx', 'gy', 'gz'
+        ];
+
+        for (const field of fields) {
+          if (typeof data[field] !== 'number' ||
+              !Number.isFinite(data[field])) {
+            throw new Error('Incomplete sensor data');
+          }
+        }
+
+        document.getElementById('light').textContent =
+          data.light.toFixed(1) + ' %';
+
+        document.getElementById('raw').textContent =
+          data.raw.toFixed(0);
+
+        for (const field of ['ax', 'ay', 'az', 'gx', 'gy', 'gz']) {
+          document.getElementById(field).textContent =
+            data[field].toFixed(2);
+        }
+
+        // Use Firebase's upload timestamp to detect old readings.
+        if (typeof data.timestamp === 'number' &&
+            Number.isFinite(data.timestamp)) {
+          const uploadTime = new Date(data.timestamp);
+          const age = Date.now() - data.timestamp;
+
+          document.getElementById('status').textContent =
+            (age > 30000
+              ? 'Readings may be old. Check Wokwi. | Last upload: '
+              : 'Receiving readings | Last upload: ') +
+            uploadTime.toLocaleString();
+        } else {
+          document.getElementById('status').textContent =
+            'Readings loaded | Upload time unavailable.';
+        }
+      } catch (error) {
+        document.getElementById('status').textContent =
+          'Could not load readings. Displayed values may be old.';
+      } finally {
+        clearTimeout(timeout);
+
+        // Request the latest readings again after five seconds.
+        setTimeout(updateDashboard, 5000);
+      }
+    }
+
+    updateDashboard();
+  </script>
+</body>
+</html>
